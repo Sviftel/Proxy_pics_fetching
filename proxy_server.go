@@ -24,10 +24,8 @@ func proxyHandler(w http.ResponseWriter, r *http.Request) {
 
 	imgSrcs := make([]string, imgUrlList.Len())
 	errc := make(chan error, imgUrlList.Len())
-	// imgTagUnion := ""
 	for e, i := imgUrlList.Front(), 0; e != nil; e, i = e.Next(), i + 1 {
 		go savePic(trgURL, e.Value.(string), &(imgSrcs[i]), errc)
-		// imgTagUnion = imgTagUnion + imgSrcs[i]
 	}
 
 	for i := 0; i < imgUrlList.Len(); i++ {

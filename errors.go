@@ -1,14 +1,19 @@
 package main
 
-import "net/http"
+import (
+	"net/http"
+	"net/url"
+)
 
 const (
-	ErrorNoURL           = "NO_URL"
-	ErrorURLParsing      = "URL_PARSING_FAILED"
-	ErrorGetInt          = "INT_GET_FAILED"
-	ErrorReadResp        = "READ_FAILED"
-	ErrorHtmlParsing     = "HTML_PARSING_FAILED"
-	ErrorInvalidFileType = "INVALID_FILE_TYPE_IN_IMG_SRC"
+	ErrorNoURL                 = "NO_URL"
+	ErrorURLParsing            = "URL_PARSING_FAILED"
+	ErrorGetInt                = "INT_GET_FAILED"
+	ErrorReadResp              = "READ_FAILED"
+	ErrorHtmlParsing           = "HTML_PARSING_FAILED"
+	// TODO: find better error code
+	ErrorInvalidFileType       = "INVALID_FILE_TYPE_IN_IMG_SRC"
+	ErrorUnsupportedDataScheme = "UNSUPPTRED_DATA_SCHEME_FOR_IMGS"
 )
 
 type ForwardedError struct {
@@ -41,22 +46,33 @@ func handleErrors(w http.ResponseWriter) {
 		switch err := handlingError.(type) {
 		case ProcessingError:
 			flr := ErrorTemplateFiller{0, "", "", ""}
-			if err.Descr == ErrorNoURL || err.Descr == ErrorURLParsing {
+			switch {
+			case err.Descr == ErrorNoURL || err.Descr == ErrorURLParsing:
 				flr = ErrorTemplateFiller {
 					StatusCode: 422,
 					Title: "422 Unprocessable Entity",
 					Header: "Unprocessable Entity",
 					Descr: err.InitErr.Error(),
 				}
-			} else if err.Descr == ErrorInvalidFileType {
-				// TODO: find better error code
-				flr = ErrorTemplateFiller {
-					StatusCode: 422,
-					Title: "422 Unprocessable Entity",
-					Header: "Unprocessable Entity",
-					Descr: err.InitErr.Error(),
+			case err.Descr == ErrorGetInt:
+				switch err.InitErr.(type) {
+				case *url.Error:
+					// TODO: check for better error handling
+					flr = ErrorTemplateFiller {
+						StatusCode: 404,
+						Title: "404 Not Found",
+						Header: "Not Found",
+						Descr: err.InitErr.Error(),
+					}
+				default:
+					flr = ErrorTemplateFiller {
+						StatusCode: 422,
+						Title: "422 Unprocessable Entity",
+						Header: "Unprocessable Entity",
+						Descr: err.InitErr.Error(),
+					}
 				}
-			} else {
+			default:
 				s := string(http.StatusInternalServerError)
 				s = s + " Internal Server Error"
 				flr = ErrorTemplateFiller {

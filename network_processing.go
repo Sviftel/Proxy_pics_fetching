@@ -1,7 +1,6 @@
 package main
 
 import (
-	// "fmt"
 	"errors"
 	"mime"
 	"strings"
@@ -19,7 +18,7 @@ func getTrgURL(r *http.Request) (*url.URL, error) {
 			return url, nil
 		}
 
-		s := "Couldn't parse '" + val[0] + "' into URL: " + err.Error()
+		s := "Parse '" + val[0] + "' into URL: invalid URI"
 		nErr := ProcessingError{Descr: ErrorURLParsing, InitErr: errors.New(s)}
 		return nil, nErr
 	}
@@ -49,7 +48,10 @@ func getOkHttpSrc(URL *url.URL) ([]byte, error) {
 }
 
 func savePic(initUrl *url.URL, src string, pic *string, errc chan error) {
-	if srcUrl, err := url.Parse(src); err == nil {
+	if strings.HasPrefix(src, "data:") {
+		*pic = "<img src=\"" + src + "\">\n"
+		errc <- nil
+	} else if srcUrl, err := url.Parse(src); err == nil {
 		pref := "<img src=\"data:"
 		suff := "\">\n"
 
@@ -73,5 +75,12 @@ func savePic(initUrl *url.URL, src string, pic *string, errc chan error) {
 		}
 		*pic = pref + base64.StdEncoding.EncodeToString(data) + suff
 		errc <- nil
+	} else {
+		s := "Unsupported data scheme: '" + src + "'"
+		err := ProcessingError{
+			Descr: ErrorUnsupportedDataScheme,
+			InitErr: errors.New(s),
+		}
+		errc <- err
 	}
 }
