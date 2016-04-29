@@ -49,11 +49,11 @@ func getOkHttpSrc(URL *url.URL) ([]byte, error) {
 
 func savePic(initUrl *url.URL, src string, pic *string, errc chan error) {
 	if strings.HasPrefix(src, "data:") {
-		*pic = "<img src=\"" + src + "\">\n"
+		*pic = "<img src=\"" + src + "\">"
 		errc <- nil
 	} else if srcUrl, err := url.Parse(src); err == nil {
 		pref := "<img src=\"data:"
-		suff := "\">\n"
+		suff := "\">"
 
 		splits := strings.Split(srcUrl.Path, ".")
 		ext := "." + splits[len(splits) - 1]
