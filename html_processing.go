@@ -7,15 +7,19 @@ import (
     "net/url"
 )
 
-func getHtmlTree(URL *url.URL) *html.Node {
-    src := getOkHttpSrc(URL)
+func getHtmlTree(URL *url.URL) (*html.Node, error) {
+    src, err := getOkHttpSrc(URL)
+    if err != nil {
+        return nil, err
+    }
 
     tree, err := html.Parse(bytes.NewReader(src))
     if err != nil {
-        panic(ProcessingError{Descr: ErrorHtmlParsing, InitErr: err})
+        // panic(ProcessingError{Descr: ErrorHtmlParsing, InitErr: err})
+        return nil, ProcessingError{Descr: ErrorHtmlParsing, InitErr: err}
     }
 
-    return tree
+    return tree, nil
 }
 
 func findImgNodes(n *html.Node, imgUrlList *list.List) {

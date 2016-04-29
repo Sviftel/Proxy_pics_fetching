@@ -16,9 +16,17 @@ type ForwardedError struct {
 	Body       []byte
 }
 
+func (e ForwardedError) Error() string {
+	return string(e.Body)
+}
+
 type ProcessingError struct {
 	Descr   string
 	InitErr error
+}
+
+func (e ProcessingError) Error() string {
+	return e.InitErr.Error()
 }
 
 type ErrorTemplateFiller struct {

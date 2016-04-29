@@ -1,35 +1,43 @@
 package main
 
 import (
-	// "errors"
-	// "fmt"
-	// "mime"
-	// "strings"
+	"strings"
 	"container/list"
-	// "encoding/base64"
-	// "io/ioutil"
 	"net/http"
-	// "net/url"
 )
 
 func proxyHandler(w http.ResponseWriter, r *http.Request) {
 	defer handleErrors(w)
 
-	trgURL := getTrgURL(r)
-	tree := getHtmlTree(trgURL)
+	trgURL, err := getTrgURL(r)
+	if err != nil {
+		panic(err)
+	}
+
+	tree, err := getHtmlTree(trgURL)
+	if err != nil {
+		panic(err)
+	}
 
 	imgUrlList := list.New()
 	findImgNodes(tree, imgUrlList)
 
 	imgSrcs := make([]string, imgUrlList.Len())
-	imgTagUnion := ""
+	errc := make(chan error, imgUrlList.Len())
+	// imgTagUnion := ""
 	for e, i := imgUrlList.Front(), 0; e != nil; e, i = e.Next(), i + 1 {
-		savePic(trgURL, e.Value.(string), &(imgSrcs[i]))
-		imgTagUnion = imgTagUnion + imgSrcs[i]
-		// fmt.Println(i, "Src:", e.Value.(string), ",len:", len(imgSrcs[i]))
+		go savePic(trgURL, e.Value.(string), &(imgSrcs[i]), errc)
+		// imgTagUnion = imgTagUnion + imgSrcs[i]
 	}
 
-	fillRespTemplate(w, imgTagUnion)
+	for i := 0; i < imgUrlList.Len(); i++ {
+		err := <-errc
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	fillRespTemplate(w, strings.Join(imgSrcs, ""))
 }
 
 func main() {

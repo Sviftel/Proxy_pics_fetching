@@ -1,6 +1,7 @@
 package main
 
 import (
+	// "fmt"
 	"errors"
 	"mime"
 	"strings"
@@ -10,42 +11,44 @@ import (
 	"net/url"
 )
 
-func getTrgURL(r *http.Request) *url.URL {
+func getTrgURL(r *http.Request) (*url.URL, error) {
 	queryVals := r.URL.Query()
 	if val, ok := queryVals["url"]; ok {
-		if url, err := url.Parse(val[0]); err == nil {
-			return url
+		url, err := url.ParseRequestURI(val[0])
+		if err == nil {
+			return url, nil
 		}
 
-		s := "Couldn't parse '" + val[0] + "' into URL"
-		panic(ProcessingError{Descr: ErrorURLParsing, InitErr: errors.New(s)})
+		s := "Couldn't parse '" + val[0] + "' into URL: " + err.Error()
+		nErr := ProcessingError{Descr: ErrorURLParsing, InitErr: errors.New(s)}
+		return nil, nErr
 	}
 
 	s := "The query '" + string(r.URL.RawQuery)
 	s = s + "' doesn't contain 'url' parameter"
-	panic(ProcessingError{Descr: ErrorNoURL, InitErr: errors.New(s)})
+	return nil, ProcessingError{Descr: ErrorNoURL, InitErr: errors.New(s)}
 }
 
-func getOkHttpSrc(URL *url.URL) []byte {
+func getOkHttpSrc(URL *url.URL) ([]byte, error) {
 	resp, err := http.Get(URL.String())
 	if err != nil {
-		panic(ProcessingError{Descr: ErrorGetInt, InitErr: err})
+		return nil, ProcessingError{Descr: ErrorGetInt, InitErr: err}
 	}
 	defer resp.Body.Close()
 
 	src, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		panic(ProcessingError{Descr: ErrorReadResp, InitErr: err})
+		return nil, ProcessingError{Descr: ErrorReadResp, InitErr: err}
 	}
 
 	if resp.StatusCode >= 300 {
-		panic(ForwardedError{StatusCode: resp.StatusCode, Body: src})
+		return nil, ForwardedError{StatusCode: resp.StatusCode, Body: src}
 	}
 
-	return src
+	return src, nil
 }
 
-func savePic(initUrl *url.URL, src string, pic *string) {
+func savePic(initUrl *url.URL, src string, pic *string, errc chan error) {
 	if srcUrl, err := url.Parse(src); err == nil {
 		pref := "<img src=\"data:"
 		suff := "\">\n"
@@ -53,15 +56,22 @@ func savePic(initUrl *url.URL, src string, pic *string) {
 		splits := strings.Split(srcUrl.Path, ".")
 		ext := "." + splits[len(splits) - 1]
 		mimeType := mime.TypeByExtension(ext)
+
 		if !strings.HasPrefix(mimeType, "image/") {
 			s := "Source '" + srcUrl.Path + "' has incorrect MIME type"
-			panic(ProcessingError{
+			err := ProcessingError{
 				Descr: ErrorInvalidFileType,
-				InitErr: errors.New(s)})
+				InitErr: errors.New(s),
+			}
+			errc <- err
 		}
 
 		pref = pref + mimeType + ";base64,"
-		data := getOkHttpSrc(initUrl.ResolveReference(srcUrl))
+		data, err := getOkHttpSrc(initUrl.ResolveReference(srcUrl))
+		if err != nil {
+			errc <- err
+		}
 		*pic = pref + base64.StdEncoding.EncodeToString(data) + suff
+		errc <- nil
 	}
 }
